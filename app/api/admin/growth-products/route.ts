@@ -1,4 +1,4 @@
-export const runtime = 'edge'; // 必须加上这一行
+
 import { NextRequest } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import fs from 'fs';
