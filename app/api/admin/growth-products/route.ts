@@ -4,6 +4,7 @@ import { BigQuery } from '@google-cloud/bigquery';
 import fs from 'fs';
 import path from 'path';
 
+
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
 if (!credentialsJson) throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
 const credentials = JSON.parse(credentialsJson);
