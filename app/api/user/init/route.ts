@@ -2,6 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { getUserProfile, createUserProfile } from "@/lib/bigquery";
 import { NextResponse } from "next/server";
 
+export const runtime = 'edge';
+
 export async function POST(req: Request) {
   const { userId } = await auth();
   console.log("[user/init] userId:", userId);
@@ -17,7 +19,7 @@ export async function POST(req: Request) {
         const body = await req.json();
         name = body.name || "";
         email = body.email || "";
-      } catch {}
+      } catch { }
       await createUserProfile(userId, name, email); // credits=20, tier='starter'
       console.log("[user/init] createUserProfile success for:", userId, name, email);
       return NextResponse.json({ created: true });

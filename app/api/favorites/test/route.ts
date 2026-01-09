@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 // GET /api/favorites/test - Test endpoint to verify API structure
 export async function GET(request: NextRequest) {
   try {

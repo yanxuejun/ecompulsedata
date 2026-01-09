@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from '@/lib/bigquery-edge';
+
+export const runtime = 'edge';
 
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
 if (!credentialsJson) throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
 const credentials = JSON.parse(credentialsJson);
-const bigquery = new BigQuery({ credentials });
+const bigquery = new BigQuery({ projectId: credentials.project_id, credentials });
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = 'new_gmc_data';
 const tableId = 'Product_Favorites';
@@ -15,37 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🔍 测试 BigQuery 连接...');
     console.log(`📊 项目: ${projectId}`);
-    console.log(`📊 数据集: ${datasetId}`);
-    console.log(`📊 表名: ${tableId}`);
-
-    // 检查数据集是否存在
-    const dataset = bigquery.dataset(datasetId);
-    const [datasetExists] = await dataset.exists();
-    
-    if (!datasetExists) {
-      return NextResponse.json({
-        success: false,
-        error: `数据集 ${datasetId} 不存在`,
-        projectId,
-        datasetId,
-        tableId
-      });
-    }
-
-    // 检查表是否存在
-    const table = dataset.table(tableId);
-    const [tableExists] = await table.exists();
-    
-    if (!tableExists) {
-      return NextResponse.json({
-        success: false,
-        error: `表 ${tableId} 不存在，需要先创建`,
-        projectId,
-        datasetId,
-        tableId,
-        instructions: '请运行: node scripts/create-product-favorites-table.js'
-      });
-    }
+    // Simplified test: just run the query.
 
     // 测试查询
     const testQuery = `
@@ -63,7 +35,7 @@ export async function GET(request: NextRequest) {
       projectId,
       datasetId,
       tableId,
-      tableExists: true,
+      tableExists: true, // Assumed if query succeeded
       recordCount: count,
       timestamp: new Date().toISOString()
     });

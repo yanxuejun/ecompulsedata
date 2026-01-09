@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from '@/lib/bigquery-edge';
+
+export const runtime = 'edge';
 
 // Initialize BigQuery
-let bigquery: BigQuery;
-if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
-  const credentials = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
-  bigquery = new BigQuery({
-    projectId: process.env.GCP_PROJECT_ID,
-    credentials: credentials
-  });
-} else {
-  bigquery = new BigQuery({
-    projectId: process.env.GCP_PROJECT_ID,
-    keyFilename: process.env.GCP_KEY_FILENAME
-  });
-}
+const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
+const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
+
+const bigquery = new BigQuery({
+  projectId: process.env.GCP_PROJECT_ID || '',
+  credentials: credentials
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -130,8 +126,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching momentum analysis:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch momentum analysis data',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -195,8 +191,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching trend statistics:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch trend statistics',
         details: error instanceof Error ? error.message : 'Unknown error'
       },

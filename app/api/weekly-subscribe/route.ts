@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from '@/lib/bigquery-edge';
 import { auth } from '@clerk/nextjs/server';
 import { Resend } from 'resend';
+
+export const runtime = 'edge';
 
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
 if (!credentialsJson) throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
 const credentials = JSON.parse(credentialsJson);
-const bigquery = new BigQuery({ credentials });
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = 'new_gmc_data';
 const tableId = 'weekly_email_subscriptions';
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       categories: 'STRING',
       keywords: 'STRING'
     };
+    const bigquery = new BigQuery({ projectId, credentials });
     await bigquery.query({ query: mergeQuery, params, types });
 
     // 发送订阅确认邮件
@@ -114,6 +116,7 @@ export async function GET(req: NextRequest) {
       params: { userid: userId },
       types: { userid: 'STRING' }
     };
+    const bigquery = new BigQuery({ projectId, credentials });
     const [rows] = await bigquery.query(options);
     if (!rows.length) return NextResponse.json({ categories: '', keywords: '' });
     return NextResponse.json(rows[0]);

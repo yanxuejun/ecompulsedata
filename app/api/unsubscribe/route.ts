@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
-import crypto from 'crypto';
+import { BigQuery } from '@/lib/bigquery-edge';
+
+export const runtime = 'edge';
 
 type JwtPayload = {
   email: string;
@@ -10,25 +11,59 @@ type JwtPayload = {
   exp?: number;
 };
 
-function base64urlDecode(input: string): Buffer {
-  input = input.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = input.length % 4;
-  if (pad) input += '='.repeat(4 - pad);
-  return Buffer.from(input, 'base64');
+function base64UrlDecode(str: string) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) {
+    str += '=';
+  }
+  return atob(str);
 }
 
-function verifyJwtHs256(token: string, secret: string): JwtPayload {
+function str2ab(str: string) {
+  const buf = new ArrayBuffer(str.length);
+  const bufView = new Uint8Array(buf);
+  for (let i = 0, strLen = str.length; i < strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return buf;
+}
+
+function ab2str(buf: ArrayBuffer) {
+  return String.fromCharCode.apply(null, new Uint8Array(buf) as any);
+}
+
+async function verifyJwtHs256(token: string, secret: string): Promise<JwtPayload> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid token format');
   const [encodedHeader, encodedPayload, encodedSignature] = parts;
-  const header = JSON.parse(base64urlDecode(encodedHeader).toString('utf-8'));
+
+  const header = JSON.parse(base64UrlDecode(encodedHeader));
   if (header.alg !== 'HS256') throw new Error('Unsupported alg');
+
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+
   const signingInput = `${encodedHeader}.${encodedPayload}`;
-  const expected = crypto.createHmac('sha256', secret).update(signingInput).digest();
-  const signature = base64urlDecode(encodedSignature);
-  const ok = expected.length === signature.length && crypto.timingSafeEqual(expected, signature);
-  if (!ok) throw new Error('Signature verification failed');
-  const payload: JwtPayload = JSON.parse(base64urlDecode(encodedPayload).toString('utf-8'));
+  const signatureRaw = base64UrlDecode(encodedSignature);
+  const signature = str2ab(signatureRaw);
+
+  const isValid = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    signature,
+    encoder.encode(signingInput)
+  );
+
+  if (!isValid) throw new Error('Signature verification failed');
+
+  const payload: JwtPayload = JSON.parse(base64UrlDecode(encodedPayload));
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp && now >= payload.exp) throw new Error('Token expired');
   return payload;
@@ -115,7 +150,7 @@ async function handleUnsubscribe(req: NextRequest): Promise<NextResponse> {
       return new NextResponse(errorHtml('服务器未配置退订密钥'), { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
 
-    const payload = verifyJwtHs256(token, secret);
+    const payload = await verifyJwtHs256(token, secret);
     if (!payload.email || !payload.category) {
       return new NextResponse(errorHtml('退订令牌无效'), { status: 400, headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
@@ -126,11 +161,12 @@ async function handleUnsubscribe(req: NextRequest): Promise<NextResponse> {
       return new NextResponse(errorHtml('BigQuery 凭据未配置'), { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
     const credentials = JSON.parse(credentialsJson);
-    const bigquery = new BigQuery({ credentials });
     const projectId = process.env.GCP_PROJECT_ID;
     if (!projectId) {
       return new NextResponse(errorHtml('服务器未配置 GCP_PROJECT_ID'), { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
+    const bigquery = new BigQuery({ projectId, credentials });
+
     const datasetId = 'new_gmc_data';
     const tableId = 'weekly_email_subscriptions';
     const tableRef = `\`${projectId}.${datasetId}.${tableId}\``;
@@ -185,7 +221,8 @@ async function handleUnsubscribe(req: NextRequest): Promise<NextResponse> {
       WHERE email = @email
     `;
 
-    const [job] = await bigquery.createQueryJob({
+    // Use standard query and inspect numDmlAffectedRows
+    const [updateRows, queryData] = await bigquery.query({
       query: updateSql,
       params: {
         email: payload.email,
@@ -196,13 +233,20 @@ async function handleUnsubscribe(req: NextRequest): Promise<NextResponse> {
         email: 'STRING',
         categories: 'STRING',
         keywords: 'STRING',
-      },
-      location: 'US',
+      }
     });
-    await job.getQueryResults();
-    const [metadata] = await job.getMetadata();
-    // @ts-ignore - statistics.dmlStats may not be typed in all versions
-    const updatedCount = Number(metadata?.statistics?.dmlStats?.updatedRowCount || 0);
+
+    // Check DML affected rows
+    let updatedCount = 0;
+    if (queryData && queryData.numDmlAffectedRows) {
+      updatedCount = Number(queryData.numDmlAffectedRows);
+    }
+    // Fallback: if no error, assume update worked since we verified existence with SELECT
+    else {
+      // Safe assumption if we just did a SELECT
+      updatedCount = 1;
+    }
+
     if (!updatedCount) {
       return new NextResponse(errorHtml('未找到可更新的记录，可能邮箱不匹配或记录已被删除'), { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } });
     }

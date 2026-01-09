@@ -1,21 +1,19 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { BigQuery } from '@/lib/bigquery-edge';
+import categoriesData from '@/public/categories.json';
 
-import { NextRequest } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
-import fs from 'fs';
-import path from 'path';
-
+export const runtime = 'edge';
 
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
 if (!credentialsJson) throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
 const credentials = JSON.parse(credentialsJson);
-const bigquery = new BigQuery({ credentials });
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = 'new_gmc_data';
 
 // 递归获取所有子目录代码的函数
 function getAllSubCategoryCodes(categories: any[], targetCode: string): string[] {
   const allCodes: string[] = [targetCode]; // 包含自身
-  
+
   function findAndCollectChildren(nodes: any[], parentCode: string) {
     for (const node of nodes) {
       if (node.code === parentCode && node.children) {
@@ -30,16 +28,14 @@ function getAllSubCategoryCodes(categories: any[], targetCode: string): string[]
       }
     }
   }
-  
+
   findAndCollectChildren(categories, targetCode);
   return allCodes;
 }
 
 // 获取categories.json数据
 function getCategoriesData() {
-  const categoriesPath = path.join(process.cwd(), 'public', 'categories.json');
-  const categoriesData = fs.readFileSync(categoriesPath, 'utf8');
-  return JSON.parse(categoriesData);
+  return categoriesData;
 }
 
 function getTableRef(period?: string) {
@@ -68,16 +64,16 @@ export async function GET(req: NextRequest) {
   let where = [];
   const params: any = {};
   if (country) { where.push('country_code = @country'); params.country = country; }
-  if (category) { 
+  if (category) {
     // 获取所有子目录代码（包括自身）
     const categories = getCategoriesData();
     const allCategoryCodes = getAllSubCategoryCodes(categories, category);
     console.log(`[TopGrowthProducts] Category ${category} includes subcategories:`, allCategoryCodes);
-    
+
     // 使用IN查询来匹配所有相关目录
     const categoryPlaceholders = allCategoryCodes.map((_, index) => `@category${index}`).join(', ');
     where.push(`CAST(report_category_id AS STRING) IN (${categoryPlaceholders})`);
-    
+
     // 为每个目录代码设置参数
     allCategoryCodes.forEach((code, index) => {
       params[`category${index}`] = code;
@@ -133,6 +129,7 @@ export async function GET(req: NextRequest) {
   const countQuery = `SELECT COUNT(1) as total FROM ${tableRef} ${whereClause}`;
 
   try {
+    const bigquery = new BigQuery({ projectId, credentials });
     console.log('[TopGrowthProducts] SQL:', query.trim());
     console.log('[TopGrowthProducts] Params:', params);
     const [rows] = await bigquery.query({ query, params });

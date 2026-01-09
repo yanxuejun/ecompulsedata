@@ -1,11 +1,11 @@
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from './bigquery-edge';
 
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
 if (!credentialsJson) {
   throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
 }
 const credentials = JSON.parse(credentialsJson);
-const bigquery = new BigQuery({ credentials });
+const bigquery = new BigQuery({ projectId: credentials.project_id, credentials });
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = 'new_gmc_data'; // 已替换为你的数据集名
 const tableId = 'UserProfile'; // TODO: 替换为你的实际表名
@@ -43,7 +43,7 @@ export async function deductUserCredit(userId: string) {
   await bigquery.query(options);
 }
 
-export async function updateUserProfileCreditsAndTier(userId: string, credits: number|null, tier: string, subscriptionId?: string) {
+export async function updateUserProfileCreditsAndTier(userId: string, credits: number | null, tier: string, subscriptionId?: string) {
   let query = `
     UPDATE ${tableRef}
     SET credits = @credits, tier = @tier, updatedAt = CURRENT_TIMESTAMP()`;

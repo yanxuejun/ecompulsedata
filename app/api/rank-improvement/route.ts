@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from '@/lib/bigquery-edge';
+
+export const runtime = 'edge';
 
 // Initialize BigQuery
-let bigquery: BigQuery;
-if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
-  const credentials = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
-  bigquery = new BigQuery({
-    projectId: process.env.GCP_PROJECT_ID,
-    credentials: credentials
-  });
-} else {
-  bigquery = new BigQuery({
-    projectId: process.env.GCP_PROJECT_ID,
-    keyFilename: process.env.GCP_KEY_FILENAME
-  });
-}
+const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
+// Check if credentials exist to avoid edge case runtime errors during build if env missing, though usually it should be there.
+// But for safety, we initialize it.
+const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
+
+const bigquery = new BigQuery({
+  projectId: process.env.GCP_PROJECT_ID || '',
+  credentials: credentials
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +27,7 @@ export async function GET(request: NextRequest) {
     // 构建查询条件
     let categoryCondition = '';
     let categoryParams = {};
-    
+
     if (categoryId === '123456') {
       // 当 categoryId=123456 时，去掉 category_id 条件，检索所有目录
       categoryCondition = '';
@@ -87,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     const [rows] = await bigquery.query(options);
     console.log(`Found ${rows.length} products with rank improvement`);
-    
+
     // Debug: Log the first row to see the data structure
     if (rows.length > 0) {
       console.log('🔍 First row data structure:', JSON.stringify(rows[0], null, 2));
@@ -105,7 +103,7 @@ export async function GET(request: NextRequest) {
         ranking_category: typeof row.ranking_category,
         image_url: typeof row.image_url
       });
-      
+
       return {
         // Ensure productTitle is always a string
         productTitle: typeof row.product_title === 'string' ? row.product_title : (row.product_title ? JSON.stringify(row.product_title) : ''),
@@ -136,8 +134,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching rank improvement analysis:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch rank improvement analysis data',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -156,7 +154,7 @@ export async function POST(request: NextRequest) {
     // 构建查询条件
     let categoryCondition = '';
     let categoryParams = {};
-    
+
     if (categoryId === '123456') {
       // 当 categoryId=123456 时，去掉 category_id 条件，检索所有目录
       categoryCondition = '';
@@ -222,8 +220,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching rank improvement statistics:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch rank improvement statistics',
         details: error instanceof Error ? error.message : 'Unknown error'
       },

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from '@/lib/bigquery-edge';
 import { auth } from '@clerk/nextjs/server';
+
+export const runtime = 'edge';
 
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
 if (!credentialsJson) throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
 const credentials = JSON.parse(credentialsJson);
-const bigquery = new BigQuery({ credentials });
+const bigquery = new BigQuery({ projectId: credentials.project_id, credentials });
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = 'new_gmc_data';
 const tableId = 'Product_Favorites';
@@ -17,18 +19,18 @@ const tableRef = `\`${projectId}.${datasetId}.${tableId}\``;
  * @returns A clean object with primitive values.
  */
 const sanitizeBigQueryRow = (row: any): any => {
-    if (!row) return row;
-    const cleanRow: any = {};
-    for (const key in row) {
-        const value = row[key];
-        // Check for the common BigQuery object structure for non-standard types
-        if (value && typeof value === 'object' && value.value !== undefined) {
-            cleanRow[key] = value.value;
-        } else {
-            cleanRow[key] = value;
-        }
+  if (!row) return row;
+  const cleanRow: any = {};
+  for (const key in row) {
+    const value = row[key];
+    // Check for the common BigQuery object structure for non-standard types
+    if (value && typeof value === 'object' && value.value !== undefined) {
+      cleanRow[key] = value.value;
+    } else {
+      cleanRow[key] = value;
     }
-    return cleanRow;
+  }
+  return cleanRow;
 };
 
 // GET /api/favorites - Fetch user's favorite products
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest) {
         offset: 'INT64'
       }
     });
-    
+
     // SANITIZATION STEP: Clean up BigQuery objects for React compatibility
     const cleanedRows = rows.map(sanitizeBigQueryRow);
 
@@ -117,7 +119,7 @@ export async function GET(request: NextRequest) {
     // SANITIZATION STEP: Extract total value, converting it to a standard number
     let total = 0;
     if (totalRaw) {
-        total = totalRaw.value ? parseInt(totalRaw.value) : parseInt(totalRaw);
+      total = totalRaw.value ? parseInt(totalRaw.value) : parseInt(totalRaw);
     }
 
     return NextResponse.json({

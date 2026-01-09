@@ -1,23 +1,25 @@
-import { NextRequest } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { NextRequest, NextResponse } from 'next/server';
+import { BigQuery } from '@/lib/bigquery-edge';
 import { stringify } from 'csv-stringify/sync';
-import fs from 'fs';
-import path from 'path';
+
+export const runtime = 'edge';
 
 const credentialsJson = process.env.GCP_SERVICE_ACCOUNT_JSON;
-const credentials = JSON.parse(credentialsJson!);
-const bigquery = new BigQuery({ credentials });
+if (!credentialsJson) throw new Error('GCP_SERVICE_ACCOUNT_JSON 环境变量未设置');
+const credentials = JSON.parse(credentialsJson);
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = 'new_gmc_data';
 const tableId = 'BestSellers_TopProducts_479974220';
 
-const BATCH_SIZE = 10000;
-const MAX_ROWS = 500000;
+const BATCH_SIZE = 5000; // Smaller batch size for Edge
+const MAX_ROWS = 50000; // Warning: 500k might timeout on Edge (usually 30s limit), reducing default limit unless configured otherwise
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const country = searchParams.get('country') || '';
   const category = searchParams.get('category') || '';
+
+  const bigquery = new BigQuery({ projectId, credentials });
 
   let where = [];
   const params: any = {};
@@ -26,68 +28,65 @@ export async function GET(req: NextRequest) {
   const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
   const tableRef = `\`${projectId}.${datasetId}.${tableId}\``;
-
-  // 生成日期目录
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10);
-  const exportDir = path.join(process.cwd(), 'exports', dateStr);
-  if (!fs.existsSync(exportDir)) {
-    fs.mkdirSync(exportDir, { recursive: true });
-  }
   const fileName = `export_${country || 'all'}_${category || 'all'}_${Date.now()}.csv`;
-  const filePath = path.join(exportDir, fileName);
 
-  let totalRows = 0;
-  let offset = 0;
-  let isFirstBatch = true;
+  // Create a TransformStream to stream data to response
+  const encoder = new TextEncoder();
 
-  try {
-    while (totalRows < MAX_ROWS) {
-      const batchQuery = `
-        SELECT
-          rank, previous_rank, ranking_country, ranking_category, 
-          brand,
-          FORMAT('%s-%s %s', CAST(price_range.min AS STRING), CAST(price_range.max AS STRING), price_range.currency) AS price_range,
-          FORMAT('%s-%s %s', CAST(relative_demand.min AS STRING), CAST(relative_demand.max AS STRING), relative_demand.bucket) AS relative_demand,
-          FORMAT('%s-%s %s', CAST(previous_relative_demand.min AS STRING), CAST(previous_relative_demand.max AS STRING), previous_relative_demand.bucket) AS previous_relative_demand,
-          FORMAT_DATE('%Y-%m-%d', DATE(rank_timestamp)) AS rank_timestamp,
-          COALESCE(
-            ARRAY(SELECT name FROM UNNEST(product_title) WHERE locale = 'en' LIMIT 1)[SAFE_OFFSET(0)],
-            ARRAY(SELECT name FROM UNNEST(product_title) WHERE locale = 'zh-CN' LIMIT 1)[SAFE_OFFSET(0)],
-            ARRAY(SELECT name FROM UNNEST(product_title) LIMIT 1)[SAFE_OFFSET(0)]
-          ) AS product_title
-        FROM ${tableRef}
-        ${whereClause}
-        ORDER BY rank ASC
-        LIMIT @batchSize OFFSET @offset
-      `;
-      const batchParams = { ...params, batchSize: BATCH_SIZE, offset };
-      const [rows] = await bigquery.query({ query: batchQuery, params: batchParams });
-      if (rows.length === 0) break;
+  const stream = new ReadableStream({
+    async start(controller) {
+      let totalRows = 0;
+      let offset = 0;
+      let isFirstBatch = true;
 
-      // 只保留 product_title 字段
-      const processedRows = rows.map((row: any) => ({
-        ...row,
-        // product_title 字段已直接在 SQL 查询中生成，无需再合并
-      }));
-      // 写入CSV
-      const csv = stringify(processedRows, { header: isFirstBatch });
-      if (isFirstBatch) {
-        fs.writeFileSync(filePath, csv);
-        isFirstBatch = false;
-      } else {
-        fs.appendFileSync(filePath, csv.replace(/^[^\n]*\n/, ''));
+      try {
+        while (totalRows < MAX_ROWS) {
+          const batchQuery = `
+            SELECT
+              rank, previous_rank, ranking_country, ranking_category, 
+              brand,
+              FORMAT('%s-%s %s', CAST(price_range.min AS STRING), CAST(price_range.max AS STRING), price_range.currency) AS price_range,
+              FORMAT('%s-%s %s', CAST(relative_demand.min AS STRING), CAST(relative_demand.max AS STRING), relative_demand.bucket) AS relative_demand,
+              FORMAT('%s-%s %s', CAST(previous_relative_demand.min AS STRING), CAST(previous_relative_demand.max AS STRING), previous_relative_demand.bucket) AS previous_relative_demand,
+              FORMAT_DATE('%Y-%m-%d', DATE(rank_timestamp)) AS rank_timestamp,
+              COALESCE(
+                ARRAY(SELECT name FROM UNNEST(product_title) WHERE locale = 'en' LIMIT 1)[SAFE_OFFSET(0)],
+                ARRAY(SELECT name FROM UNNEST(product_title) WHERE locale = 'zh-CN' LIMIT 1)[SAFE_OFFSET(0)],
+                ARRAY(SELECT name FROM UNNEST(product_title) LIMIT 1)[SAFE_OFFSET(0)]
+              ) AS product_title
+            FROM ${tableRef}
+            ${whereClause}
+            ORDER BY rank ASC
+            LIMIT @batchSize OFFSET @offset
+          `;
+
+          const batchParams = { ...params, batchSize: BATCH_SIZE, offset };
+          console.log(`Fetching batch offset ${offset}...`);
+          const [rows] = await bigquery.query({ query: batchQuery, params: batchParams });
+
+          if (!rows || rows.length === 0) break;
+
+          const csvChunk = stringify(rows, { header: isFirstBatch });
+          controller.enqueue(encoder.encode(csvChunk));
+
+          isFirstBatch = false;
+          totalRows += rows.length;
+          offset += BATCH_SIZE;
+
+          if (rows.length < BATCH_SIZE) break;
+        }
+        controller.close();
+      } catch (err: any) {
+        console.error("Stream Error:", err);
+        controller.error(err);
       }
-
-      totalRows += rows.length;
-      offset += BATCH_SIZE;
-      if (rows.length < BATCH_SIZE) break;
     }
+  });
 
-    return new Response(JSON.stringify({ success: true, file: `/exports/${dateStr}/${fileName}`, totalRows: Math.min(totalRows, MAX_ROWS) }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (err: any) {
-    return new Response('Error: ' + err.message, { status: 500 });
-  }
+  return new NextResponse(stream, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    }
+  });
 } 

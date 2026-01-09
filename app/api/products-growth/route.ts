@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BigQuery } from "@google-cloud/bigquery";
+import { BigQuery } from "@/lib/bigquery-edge";
+
+export const runtime = 'edge';
 
 const projectId = process.env.GCP_PROJECT_ID!;
 const datasetId = process.env.GCP_DATASET_ID!;

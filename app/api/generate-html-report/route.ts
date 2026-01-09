@@ -1,20 +1,22 @@
 import { NextRequest } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+
+export const runtime = 'edge';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY!;
 
 export async function POST(req: NextRequest) {
-  const { filePath, prompt, model = 'gpt' } = await req.json();
+  // Refactored for Edge: 'csvContent' must be provided directly in the body.
+  // 'filePath' is ignored/deprecated as there is no file system.
+  const { filePath, csvContent: inputCsvContent, prompt, model = 'gpt' } = await req.json();
 
-  // 1. 读取 CSV 文件内容
-  const absPath = path.join(process.cwd(), filePath);
-  if (!fs.existsSync(absPath)) {
-    return new Response('CSV file not found', { status: 404 });
+  // 1. 获取 CSV 内容 (优先使用传入的内容, 否则报错 - 无法读取本地文件)
+  if (!inputCsvContent) {
+    return new Response('CSV content must be provided in request body for Edge runtime.', { status: 400 });
   }
-  const csvContent = fs.readFileSync(absPath, 'utf-8');
+  const csvContent = inputCsvContent;
+
 
   // 2. 构造 prompt
   const fullPrompt = `
@@ -103,14 +105,13 @@ ${prompt || ''}
     console.log('[GPT] Response:', html.slice(0, 1000));
   }
 
-  // 4. 保存为 html 文件（与 csv 或 analyzed html 同目录，文件名加模型后缀）
-  const modelSuffix = model ? `_${model}` : '';
-  const htmlFilePath = absPath.replace(/(\.analyzed)?\.html$/, `${modelSuffix}.html`).replace(/\.csv$/, `${modelSuffix}.html`);
-  fs.writeFileSync(htmlFilePath, html);
+  // 4. 保存为 html 文件 -> Edge 不支持文件系统，直接返回内容
+  // const modelSuffix = model ? `_${model}` : '';
+  // const htmlFilePath = absPath.replace(/(\.analyzed)?\.html$/, `${modelSuffix}.html`).replace(/\.csv$/, `${modelSuffix}.html`);
+  // fs.writeFileSync(htmlFilePath, html);
 
-  // 5. 返回 HTML 路径
-  const relHtmlPath = filePath.replace(/(\.analyzed)?\.html$/, `${modelSuffix}.html`).replace(/\.csv$/, `${modelSuffix}.html`);
-  return new Response(JSON.stringify({ success: true, html, htmlFile: relHtmlPath }), {
+  // 5. 返回 HTML 内容
+  return new Response(JSON.stringify({ success: true, html, message: "File saving skipped on Edge runtime" }), {
     headers: { 'Content-Type': 'application/json' }
   });
 } 

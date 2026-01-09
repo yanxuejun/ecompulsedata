@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import Papa from 'papaparse';
+import categoriesData from '@/public/categories.json';
+
+export const runtime = 'edge';
 
 // 递归查找 catalog_name
 function findCategoryName(nodes: any, code: any): string {
@@ -16,12 +17,14 @@ function findCategoryName(nodes: any, code: any): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { filePath } = await req.json();
-  const absPath = path.join(process.cwd(), filePath);
-  if (!fs.existsSync(absPath)) {
-    return new Response('CSV file not found', { status: 404 });
+  const { filePath, csvContent: inputCsvContent } = await req.json();
+
+  // Use inputCsvContent directly
+  if (!inputCsvContent) {
+    return new Response('CSV content must be provided in body', { status: 400 });
   }
-  const csvContent = fs.readFileSync(absPath, 'utf-8');
+  const csvContent = inputCsvContent;
+
   const parsed = Papa.parse(csvContent, { header: true });
   const rows = parsed.data.filter((r: any) => r.product_title);
 
@@ -137,13 +140,12 @@ export async function POST(req: NextRequest) {
   </table>`;
 
   // 1. 从文件名提取类目ID
-  const match = filePath.match(/export_[^_]+_(\d+)_/);
+  const match = (filePath || '').match(/export_[^_]+_(\d+)_/);
   const categoryId = match ? match[1] : '';
   // 2. 查找类目名称
   let categoryName = '';
   try {
-    const categoriesRaw = fs.readFileSync(path.join(process.cwd(), 'public', 'categories.json'), 'utf-8');
-    const categories = JSON.parse(categoriesRaw);
+    const categories = categoriesData;
     categoryName = categoryId ? findCategoryName(categories, categoryId) : '';
   } catch (e) {
     categoryName = '';
@@ -238,11 +240,8 @@ export async function POST(req: NextRequest) {
   </div>
 `;
 
-  // 保存 HTML
-  const htmlFilePath = absPath.replace(/\.csv$/, '.analyzed.html');
-  fs.writeFileSync(htmlFilePath, html, 'utf-8');
-  const relHtmlPath = filePath.replace(/\.csv$/, '.analyzed.html');
-  return new Response(JSON.stringify({ success: true, htmlFile: relHtmlPath }), {
+  // 直接返回 HTML; 不保存文件
+  return new Response(JSON.stringify({ success: true, html, message: "Report generated in memory" }), {
     headers: { 'Content-Type': 'application/json' }
   });
 } 
