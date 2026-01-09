@@ -3,7 +3,7 @@ import { MetadataRoute } from 'next'
 export const runtime = 'edge';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-    const baseUrl = process.env.SITE_URL || 'https://ecompulsedata.com';
+    const baseUrl = 'https://www.ecompulsedata.com';
 
     const routes = [
         '',
