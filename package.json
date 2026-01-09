@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "prisma generate && next build",
-    "postbuild": "next-sitemap",
+    "postbuild": "next-sitemap && cp public/sitemap*.xml .vercel/output/static/",
     "start": "next start",
     "lint": "next lint",
     "update-product-rank": "node scripts/update-product-week-rank.js",
