@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
+export const runtime = 'edge';
+
 // 检查环境变量
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error("STRIPE_SECRET_KEY is not set");
 }
 
 // 只有在有密钥时才初始化 Stripe
-const stripe = process.env.STRIPE_SECRET_KEY 
+const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-06-30.basil",
-    })
+    apiVersion: "2025-06-30.basil",
+  })
   : null;
 
 export async function GET(req: NextRequest) {
@@ -23,8 +25,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (!stripe || !process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json({ 
-        error: "Stripe not configured. Please set STRIPE_SECRET_KEY environment variable." 
+      return NextResponse.json({
+        error: "Stripe not configured. Please set STRIPE_SECRET_KEY environment variable."
       }, { status: 500 });
     }
 

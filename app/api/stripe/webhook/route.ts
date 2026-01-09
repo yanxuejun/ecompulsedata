@@ -4,18 +4,20 @@ import { headers } from "next/headers";
 // 1. 引入 BigQuery 工具
 import { updateUserProfileCreditsAndTier, getUserProfile } from '@/lib/bigquery';
 
+export const runtime = 'edge';
+
 // 检查环境变量
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error("STRIPE_SECRET_KEY is not set");
 
-  
+
 }
 
 // 只有在有密钥时才初始化 Stripe
-const stripe = process.env.STRIPE_SECRET_KEY 
+const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-06-30.basil",
-    })
+    apiVersion: "2025-06-30.basil",
+  })
   : null;
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

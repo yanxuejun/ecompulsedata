@@ -89,28 +89,26 @@ async function signJwt(payload: any, privateKeyPem: string, sub: string) {
 }
 
 class BigQueryEdgeClient {
-  private projectId: string;
-  private clientEmail: string;
-  private privateKey: string;
-  private accessToken: string | null = null;
+  public readonly projectId: string;
+  private credentials: { client_email: string; private_key: string };
+  private token: string | null = null;
   private tokenExpiry: number = 0;
 
   constructor(options: { projectId: string; credentials: { client_email: string; private_key: string } }) {
     this.projectId = options.projectId;
-    this.clientEmail = options.credentials.client_email;
-    this.privateKey = options.credentials.private_key;
+    this.credentials = options.credentials;
   }
 
   private async getAuthToken() {
     // Check if token is valid (with buffer)
-    if (this.accessToken && Date.now() < this.tokenExpiry - 60000) {
-      return this.accessToken;
+    if (this.token && Date.now() < this.tokenExpiry - 60000) {
+      return this.token;
     }
 
     const jwt = await signJwt(
-      { client_email: this.clientEmail },
-      this.privateKey,
-      this.clientEmail
+      { client_email: this.credentials.client_email },
+      this.credentials.private_key,
+      this.credentials.client_email
     );
 
     const response = await fetch("https://oauth2.googleapis.com/token", {
@@ -127,9 +125,9 @@ class BigQueryEdgeClient {
     }
 
     const data = await response.json();
-    this.accessToken = data.access_token;
+    this.token = data.access_token;
     this.tokenExpiry = Date.now() + (data.expires_in * 1000);
-    return this.accessToken;
+    return this.token;
   }
 
   async query(options: { query: string; params?: any; types?: any; location?: string }) {
@@ -163,9 +161,6 @@ class BigQueryEdgeClient {
       });
     }
 
-    // Ignore location for simple query endpoint (it's implicit or default). 
-    // If strict location needed, might need jobs.insert, but query endpoint usually handles it.
-
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -192,7 +187,7 @@ class BigQueryEdgeClient {
       return obj;
     }) || [];
 
-    // Return rows and raw response (for metadata like numDmlAffectedRows)
+    // Return rows and raw response
     return [rows, data];
   }
 
