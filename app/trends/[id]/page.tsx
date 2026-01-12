@@ -1,8 +1,6 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-import { db } from '@/lib/firebase-admin';
-import { doc, getDoc } from 'firebase/firestore';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 
@@ -10,73 +8,78 @@ type Props = {
     params: Promise<{ id: string }>;
 };
 
+// 工具函数：将 Firestore REST API 的复杂格式转为普通 JSON
+function formatFirestoreData(fields: any) {
+    const result: any = {};
+    for (const key in fields) {
+        const valueObj = fields[key];
+        const type = Object.keys(valueObj)[0];
+        let val = valueObj[type];
+
+        if (type === 'arrayValue') {
+            val = val.values ? val.values.map((v: any) => formatFirestoreData(v.mapValue.fields)) : [];
+        } else if (type === 'timestampValue') {
+            val = new Date(val).toLocaleDateString();
+        } else if (type === 'integerValue') {
+            val = parseInt(val);
+        }
+        result[key] = val;
+    }
+    return result;
+}
+
+async function getDocViaRest(id: string) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+    // 直接使用 Google API 域名，永不走 SDK 逻辑
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/site_content/${id}?key=${apiKey}`;
+
+    const res = await fetch(url, {
+        next: { revalidate: 3600 }, // 开启 Next.js 缓存（1小时）
+    });
+
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Rest API Error: ${res.statusText}`);
+
+    const rawData = await res.json();
+    return formatFirestoreData(rawData.fields);
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { id } = await params;
-    try {
-        const docRef = doc(db, 'site_content', id);
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) return { title: 'Not Found' };
-        const data = docSnap.data();
-        return { title: `${data.category_name || 'Trends'} - 2026 Market Analysis` };
-    } catch (e) {
-        return { title: 'Market Trends' };
-    }
+    const data = await getDocViaRest(id);
+    if (!data) return { title: 'Category Not Found' };
+    return { title: `${data.category_name} - 2026 Trends` };
 }
 
 export default async function TrendPage({ params }: Props) {
     const { id } = await params;
+    const data = await getDocViaRest(id);
 
-    let data: any;
-    try {
-        const docRef = doc(db, 'site_content', id);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists()) {
-            console.error(`Document with ID ${id} not found in Firestore`);
-            notFound();
-        }
-        data = docSnap.data();
-    } catch (error) {
-        // 这能帮助你在 Cloudflare Logs 里看到具体错误
-        console.error("Critical Firestore Error:", error);
-        throw error;
-    }
-
-    // 安全地处理日期显示
-    const displayDate = () => {
-        try {
-            if (data.last_updated?.toDate) return data.last_updated.toDate().toLocaleDateString();
-            if (data.last_updated?.seconds) return new Date(data.last_updated.seconds * 1000).toLocaleDateString();
-            return new Date().toLocaleDateString();
-        } catch (e) {
-            return 'Recently Updated';
-        }
-    };
+    if (!data) notFound();
 
     return (
-        <main className="max-w-5xl mx-auto px-4 py-8 tracking-tight">
-            <nav className="mb-4 text-sm"><a href="/" className="text-blue-600">Home</a> / {id}</nav>
+        <main className="max-w-5xl mx-auto px-4 py-8 font-sans antialiased">
+            <nav className="text-sm text-gray-500 mb-8">
+                <a href="/" className="hover:underline">Home</a> / <span className="font-semibold text-gray-900">{data.category_name}</span>
+            </nav>
 
-            <header className="mb-10">
-                <h1 className="text-4xl font-black text-gray-900 mb-2">
-                    {data.category_name || 'Market Category'}
-                </h1>
-                <p className="text-gray-500 text-sm">Update: {displayDate()}</p>
-            </header>
-
-            {data.seo_description && (
-                <section className="mb-12 p-6 bg-blue-50 border border-blue-100 rounded-2xl text-gray-700 leading-relaxed">
+            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm mb-12">
+                <h1 className="text-4xl font-extrabold text-gray-900 mb-4">{data.category_name}</h1>
+                <p className="text-lg text-gray-600 leading-relaxed italic border-l-4 border-blue-500 pl-4">
                     {data.seo_description}
-                </section>
-            )}
+                </p>
+            </div>
 
-            <div className="space-y-3">
+            <div className="grid gap-4">
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Top Performance Products</h2>
                 {data.top_100_products?.map((item: any, idx: number) => (
-                    <div key={idx} className="flex items-center p-4 bg-white border rounded-xl shadow-sm">
-                        <span className="w-10 font-bold text-blue-600">#{item.rank || idx + 1}</span>
-                        <div className="flex-1">
-                            <p className="font-bold text-gray-900">{item.title}</p>
-                            <p className="text-xs text-gray-400">{item.brand}</p>
+                    <div key={idx} className="flex items-center p-5 bg-gray-50 hover:bg-white hover:shadow-md transition-all rounded-2xl border border-transparent hover:border-blue-100">
+                        <span className="text-2xl font-black text-blue-200 mr-6 w-8 text-center">{(idx + 1).toString().padStart(2, '0')}</span>
+                        <div>
+                            <p className="font-bold text-gray-900 text-lg">{item.title}</p>
+                            <p className="text-sm text-blue-600 font-medium">{item.brand || 'Trending Brand'}</p>
                         </div>
                     </div>
                 ))}
