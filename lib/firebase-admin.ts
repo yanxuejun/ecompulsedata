@@ -1,18 +1,14 @@
-// lib/firebase-admin.ts
-import admin from 'firebase-admin';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-            }),
-        });
-    } catch (error) {
-        console.error('Firebase admin initialization error', error);
-    }
-}
+// 这里的配置对应你之前的环境变量
+const firebaseConfig = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    // 注意：JS SDK 不需要 clientEmail 和 privateKey 
+    // 但为了安全读取 Firestore，请确保你的 Firestore 规则允许读取
+    // 或者使用更加轻量级的 REST 方式。
+};
 
-export const db = admin.firestore();
+// 初始化单例
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const db = getFirestore(app);
