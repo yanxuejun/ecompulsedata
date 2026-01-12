@@ -1,52 +1,47 @@
-export const runtime = 'edge'; // 添加这一行
-import { db } from '@/lib/firebase-admin';
+export const runtime = 'edge'; // 必须保持 edge 运行时
 
-// 强制动态渲染，不使用缓存
-export const dynamic = 'force-dynamic';
+import { db } from '@/lib/firebase-admin';
+import { collection, query, limit, getDocs } from 'firebase/firestore';
 
 export default async function TestDBPage() {
     try {
-        // 尝试读取一个已知 ID，或者获取集合前 1 条数据进行测试
-        const snapshot = await db.collection('site_content').limit(1).get();
+        // 使用 JS SDK 的新语法：query(collection(db, 'name'), limit(n))
+        const q = query(collection(db, 'site_content'), limit(1));
+        const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
             return (
-                <div style={{ padding: '40px' }}>
-                    <h1 style={{ color: '#d97706' }}>✅ 连接成功，但数据库是空的</h1>
-                    <p>Firebase 握手成功，但 'site_content' 集合里没有任何文档。</p>
+                <div className="p-10">
+                    <h1 className="text-red-500 text-2xl">Connection Successful!</h1>
+                    <p className="mt-4">But the collection "site_content" is empty.</p>
                 </div>
             );
         }
 
-        const firstDoc = snapshot.docs[0].data();
+        const data = snapshot.docs[0].data();
 
         return (
-            <div style={{ padding: '40px', fontFamily: 'sans-serif' }}>
-                <h1 style={{ color: '#16a34a' }}>🚀 Firebase 连接成功!</h1>
-                <div style={{ marginTop: '20px', padding: '15px', background: '#f3f4f6', border: '1px solid #ddd' }}>
-                    <p><b>项目 ID:</b> {process.env.FIREBASE_PROJECT_ID}</p>
-                    <p><b>读取到的分类:</b> {firstDoc.category_name}</p>
+            <div className="p-10">
+                <h1 className="text-green-500 text-2xl">✅ Database Connected!</h1>
+                <div className="mt-6 p-4 bg-gray-100 rounded border">
+                    <p><strong>First Document ID:</strong> {snapshot.docs[0].id}</p>
+                    <pre className="mt-2 text-xs overflow-auto">
+                        {JSON.stringify(data, null, 2)}
+                    </pre>
                 </div>
-                <h3 style={{ marginTop: '20px' }}>第一条商品预览:</h3>
-                <pre style={{ background: '#1e1e1e', color: '#4ade80', padding: '15px', borderRadius: '8px', overflow: 'auto' }}>
-                    {JSON.stringify(firstDoc.top_100_products?.[0], null, 2)}
-                </pre>
             </div>
         );
     } catch (error: any) {
+        console.error("Database test error:", error);
         return (
-            <div style={{ padding: '40px', color: '#dc2626' }}>
-                <h1>❌ 连接失败</h1>
-                <pre style={{ background: '#fee2e2', padding: '15px', border: '1px solid #fecaca' }}>
-                    {error.message}
-                </pre>
-                <div style={{ marginTop: '20px', color: '#666' }}>
-                    <p><b>常见原因：</b></p>
-                    <ul>
-                        <li>环境变量 <code>FIREBASE_PRIVATE_KEY</code> 没填对</li>
-                        <li>Cloudflare 未开启 <code>nodejs_compat</code></li>
-                    </ul>
-                </div>
+            <div className="p-10">
+                <h1 className="text-red-500 text-2xl">❌ Connection Failed</h1>
+                <p className="mt-4 bg-red-50 p-4 border border-red-200 text-red-700">
+                    {error.message || "Unknown error occurred"}
+                </p>
+                <p className="mt-2 text-sm text-gray-500">
+                    Check if your Firestore Security Rules allow public read.
+                </p>
             </div>
         );
     }
