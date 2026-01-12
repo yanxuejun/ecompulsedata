@@ -1,22 +1,17 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, terminate, outOfBandConfirmation, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
+    // 必须确保 Cloudflare 后台配置了这些环境变量
     projectId: process.env.FIREBASE_PROJECT_ID,
-    // 即使只读，有时也需要一个空的 apiKey 来防止 SDK 报错
-    apiKey: "AIzaSy..." // 你可以从 Firebase 控制台 Project Settings 获取真实的，或者留空
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
 };
 
-// 初始化 App
+// 1. 初始化 App（单例模式）
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-/**
- * 关键修改：使用 initializeFirestore 而不是 getFirestore
- * 并且设置 forceLongPolling: true 
- * 这会强制 SDK 使用 Cloudflare 支持的普通 HTTP 请求
- */
-import { getFirestore, skipNetworkErrorDiffing } from 'firebase/firestore';
-
+// 2. 初始化 Firestore 并强制开启 HTTP 长轮询模式
+// 这是在 Cloudflare Edge Runtime 中唯一能稳定运行的方式
 export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: true, // 强制长轮询（HTTP 模式）
+    experimentalForceLongPolling: true,
 });
