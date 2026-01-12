@@ -1,3 +1,4 @@
+export const runtime = 'edge'; // 添加这一行
 import { db } from '@/lib/firebase-admin';
 
 // 强制动态渲染，不使用缓存

@@ -1,3 +1,6 @@
+export const runtime = 'edge'; // 添加这一行
+export const dynamic = 'force-dynamic'; // 建议同时也显式声明为动态
+
 import { db } from '@/lib/firebase-admin';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
