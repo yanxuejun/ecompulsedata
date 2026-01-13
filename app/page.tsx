@@ -1,6 +1,6 @@
 
-export const runtime = 'edge'; // 必须声明以支持 Cloudflare
-export const dynamic = 'force-dynamic'; // 强制动态，跳过所有静态缓存
+// export const runtime = 'edge'; // 必须声明以支持 Cloudflare
+// export const dynamic = 'force-dynamic'; // 强制动态，跳过所有静态缓存
 
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
@@ -10,7 +10,7 @@ import Features from '@/components/Features';
 import TrendPreview from '@/components/TrendPreview';
 import Footer from '@/components/Footer';
 import HomeGrowthSection from "./components/HomeGrowthSection";
-import CategoryGrid from '@/components/CategoryGrid'; // 1. 引入新组件
+// import CategoryGrid from '@/components/CategoryGrid'; // 1. 引入新组件
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Suspense } from 'react';
