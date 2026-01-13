@@ -10,7 +10,7 @@ import Features from '@/components/Features';
 import TrendPreview from '@/components/TrendPreview';
 import Footer from '@/components/Footer';
 import HomeGrowthSection from "./components/HomeGrowthSection";
-// import CategoryGrid from '@/components/CategoryGrid'; // 1. 引入新组件
+import CategoryGrid from '@/components/CategoryGrid'; // 1. 引入新组件
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Suspense } from 'react';
@@ -22,7 +22,7 @@ export default function Home() {
       <main>
         <Hero />
         <DataStats />
-
+        <CategoryGrid />
         <SocialProof />
         <Features />
       </main>
