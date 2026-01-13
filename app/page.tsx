@@ -20,7 +20,9 @@ export default function Home() {
       <main>
         <Hero />
         <DataStats />
-        <CategoryGrid />
+        <Suspense fallback={<div className="py-20 text-center">Loading trends...</div>}>
+          <CategoryGrid />
+        </Suspense>
         <SocialProof />
         <Features />
       </main>
