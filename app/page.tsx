@@ -1,3 +1,6 @@
+
+export const runtime = 'edge'; // 必须声明以支持 Cloudflare
+
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import DataStats from '@/components/DataStats';
@@ -6,6 +9,7 @@ import Features from '@/components/Features';
 import TrendPreview from '@/components/TrendPreview';
 import Footer from '@/components/Footer';
 import HomeGrowthSection from "./components/HomeGrowthSection";
+import CategoryGrid from '@/components/CategoryGrid'; // 1. 引入新组件
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +20,7 @@ export default function Home() {
       <main>
         <Hero />
         <DataStats />
+        <CategoryGrid />
         <SocialProof />
         <Features />
       </main>
