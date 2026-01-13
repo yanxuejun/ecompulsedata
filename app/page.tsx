@@ -1,5 +1,6 @@
 
 export const runtime = 'edge'; // 必须声明以支持 Cloudflare
+export const dynamic = 'force-dynamic'; // 强制动态，跳过所有静态缓存
 
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';

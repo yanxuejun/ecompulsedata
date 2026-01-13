@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import { Suspense } from 'react';
+
 
 type Props = {
     params: Promise<{ id: string }>;
