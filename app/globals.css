@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   --color-primary: #1A237E;
   --color-dark: #212121;
@@ -10,7 +14,7 @@
   --color-card: #FFFFFF;
   --color-up: #4CAF50;
   --color-down: #F44336;
-  
+
   --font-family-heading: 'Montserrat', 'Lato', sans-serif;
   --font-family-body: 'Inter', 'Nunito Sans', sans-serif;
 }
@@ -19,7 +23,13 @@
   body {
     font-family: var(--font-family-body);
   }
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-family-heading);
   }
-} 
+}
