@@ -125,17 +125,17 @@ export default async function TrendPage({ params }: Props) {
                                 </span>
                             </div>
 
-                            {typeof item.image_url === 'string' && item.image_url.trim() !== '' && (
-                                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-white flex-shrink-0 border border-slate-100 mr-8 p-1">
+                            {item.image_url && typeof item.image_url === 'string' && (
+                                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-50 flex-shrink-0 border border-slate-100 mr-8 p-1 relative">
                                     <img
                                         src={item.image_url}
-                                        alt={item.title || "Product Image"}
-                                        className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                                        // 使用更安全的错误处理
-                                        onError={(e) => {
-                                            e.currentTarget.parentElement!.style.display = 'none';
-                                        }}
+                                        alt={item.title}
+                                        className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 relative z-10"
                                     />
+                                    {/* 图片下方的占位背景，如果图片加载失败会显示出灰色底色 */}
+                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-300">
+                                        Loading...
+                                    </div>
                                 </div>
                             )}
                         </div>
