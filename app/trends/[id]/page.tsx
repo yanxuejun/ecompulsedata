@@ -13,6 +13,7 @@ type Props = {
  * 格式化 Firestore REST API 返回的复杂对象
  */
 function formatFirestoreData(fields: any) {
+    if (!fields) return {};
     const result: any = {};
     for (const key in fields) {
         const valueObj = fields[key];
@@ -20,7 +21,14 @@ function formatFirestoreData(fields: any) {
         let val = valueObj[type];
 
         if (type === 'arrayValue') {
-            val = val.values ? val.values.map((v: any) => formatFirestoreData(v.mapValue.fields)) : [];
+            // 改进点：检查数组内是对象(mapValue)还是普通值
+            val = val.values ? val.values.map((v: any) => {
+                const subType = Object.keys(v)[0];
+                if (subType === 'mapValue') return formatFirestoreData(v.mapValue.fields);
+                return v[subType]; // 返回字符串、数字等基本类型
+            }) : [];
+        } else if (type === 'mapValue') {
+            val = formatFirestoreData(val.fields);
         } else if (type === 'timestampValue') {
             val = new Date(val).toLocaleDateString();
         } else if (type === 'integerValue') {
@@ -117,13 +125,16 @@ export default async function TrendPage({ params }: Props) {
                                 </span>
                             </div>
 
-                            {item.image_url && (
+                            {typeof item.image_url === 'string' && item.image_url.trim() !== '' && (
                                 <div className="w-24 h-24 rounded-2xl overflow-hidden bg-white flex-shrink-0 border border-slate-100 mr-8 p-1">
                                     <img
                                         src={item.image_url}
-                                        alt={item.title}
+                                        alt={item.title || "Product Image"}
                                         className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                                        // 使用更安全的错误处理
+                                        onError={(e) => {
+                                            e.currentTarget.parentElement!.style.display = 'none';
+                                        }}
                                     />
                                 </div>
                             )}
@@ -141,8 +152,8 @@ export default async function TrendPage({ params }: Props) {
 
                                 {/* 需求度勋章 */}
                                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border ${item.relative_demand === 'VERY_HIGH'
-                                        ? 'bg-orange-50 border-orange-100 text-orange-600'
-                                        : 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                                    ? 'bg-orange-50 border-orange-100 text-orange-600'
+                                    : 'bg-emerald-50 border-emerald-100 text-emerald-600'
                                     }`}>
                                     <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${item.relative_demand === 'VERY_HIGH' ? 'bg-orange-400' : 'bg-emerald-400'
                                         }`} />
