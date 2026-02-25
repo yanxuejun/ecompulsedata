@@ -36,8 +36,13 @@ async function getAllCategories() {
             id: doc.name.split('/').pop(),
             ...formatFirestoreData(doc.fields)
         }));
-    } catch (e) {
-        console.error("Home Grid Fetch Error:", e);
+    } catch (e: any) {
+        // 打印详细错误信息
+        console.error("--- 调试信息开始 ---");
+        console.error("错误类型:", e.name);
+        console.error("错误消息:", e.message);
+        if (e.cause) console.error("原始原因:", e.cause);
+        console.error("--- 调试信息结束 ---");
         return [];
     }
 }
