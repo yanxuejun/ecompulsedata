@@ -27,45 +27,21 @@ async function getAllCategories() {
         });
 
         if (!res.ok) {
-
-            let errorDetail = "No JSON body";
-            try {
-                const data = await res.json();
-                errorDetail = JSON.stringify(data, null, 2);
-            } catch (e) { }
-
-            // 直接在页面上渲染这些信息，不要 console.log 了
-            return (
-                <div className="p-10 bg-red-50 border-2 border-red-500 text-red-900 font-mono text-xs overflow-auto">
-                    <h1 className="text-xl font-bold mb-4">Debug: Firestore Fetch Failed</h1>
-                    <p><strong>Status:</strong> {res.status} {res.statusText}</p>
-                    <p><strong>Project ID:</strong> {projectId || "UNDEFINED (Check Environment Variables)"}</p>
-                    <p><strong>API Key (First 5):</strong> {apiKey ? apiKey.substring(0, 5) + "..." : "MISSING"}</p>
-                    <hr className="my-4" />
-                    <p><strong>Full URL:</strong> {url.replace(apiKey || "", "HIDDEN_KEY")}</p>
-                    <hr className="my-4" />
-                    <pre className="bg-black text-green-400 p-4 rounded">
-                        {errorDetail}
-                    </pre>
-                </div>
-            );
-
-
             // 1. 尝试解析 Firestore 返回的详细错误 JSON
-            // try {
-            //     const errorData = await res.json();
-            //     console.log("Secret Value:", apiKey);
-            //     console.error("Firestore Error Details:", JSON.stringify(errorData, null, 2));
+            try {
+                const errorData = await res.json();
+                console.log("Secret Value:", apiKey);
+                console.error("Firestore Error Details:", JSON.stringify(errorData, null, 2));
 
-            //     // 通常详细信息在 errorData.error.message 中
-            //     const message = errorData.error?.message || "Unknown error";
-            //     console.error(`Status: ${res.status}, Message: ${message}`);
-            // } catch (parseError) {
-            //     // 如果响应不是 JSON（例如网络彻底崩溃），则回退到基础错误
-            //     console.error(`Firestore REST Error: ${res.statusText}`);
-            // }
+                // 通常详细信息在 errorData.error.message 中
+                const message = errorData.error?.message || "Unknown error";
+                console.error(`Status: ${res.status}, Message: ${message}`);
+            } catch (parseError) {
+                // 如果响应不是 JSON（例如网络彻底崩溃），则回退到基础错误
+                console.error(`Firestore REST Error: ${res.statusText}`);
+            }
 
-            // return [];
+            return [];
         }
 
         const data = await res.json();
