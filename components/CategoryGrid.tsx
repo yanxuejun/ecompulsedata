@@ -28,17 +28,29 @@ async function getAllCategories() {
 
         if (!res.ok) {
 
-            const errorData = await res.json().catch(() => ({}));
-            const debugInfo = {
-                status: res.status,
-                projectId: projectId,
-                apiKey: apiKey?.substring(0, 5) + "...", // 打印前5位确认是否读取成功
-                error: errorData
-            };
+            let errorDetail = "No JSON body";
+            try {
+                const data = await res.json();
+                errorDetail = JSON.stringify(data, null, 2);
+            } catch (e) { }
 
-            // 暂时抛出一个错误，Next.js 会在页面上显示错误详情（开发模式）
-            // 或者你可以直接 return 一个包含信息的 div
-            throw new Error(`DEBUG_INFO: ${JSON.stringify(debugInfo)}`);
+            // 直接在页面上渲染这些信息，不要 console.log 了
+            return (
+                <div className="p-10 bg-red-50 border-2 border-red-500 text-red-900 font-mono text-xs overflow-auto">
+                    <h1 className="text-xl font-bold mb-4">Debug: Firestore Fetch Failed</h1>
+                    <p><strong>Status:</strong> {res.status} {res.statusText}</p>
+                    <p><strong>Project ID:</strong> {projectId || "UNDEFINED (Check Environment Variables)"}</p>
+                    <p><strong>API Key (First 5):</strong> {apiKey ? apiKey.substring(0, 5) + "..." : "MISSING"}</p>
+                    <hr className="my-4" />
+                    <p><strong>Full URL:</strong> {url.replace(apiKey || "", "HIDDEN_KEY")}</p>
+                    <hr className="my-4" />
+                    <pre className="bg-black text-green-400 p-4 rounded">
+                        {errorDetail}
+                    </pre>
+                </div>
+            );
+
+
             // 1. 尝试解析 Firestore 返回的详细错误 JSON
             // try {
             //     const errorData = await res.json();
