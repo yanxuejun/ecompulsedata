@@ -16,6 +16,8 @@ async function getAllCategories() {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
+
+
     // 使用 REST API 的列表接口，只获取必要的字段以提高速度
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/site_content?key=${apiKey}`;
 
@@ -25,7 +27,20 @@ async function getAllCategories() {
         });
 
         if (!res.ok) {
-            console.error(`Firestore REST Error: ${res.status}`);
+            // 1. 尝试解析 Firestore 返回的详细错误 JSON
+            try {
+                const errorData = await res.json();
+                console.log("Secret Value:", apiKey);
+                console.error("Firestore Error Details:", JSON.stringify(errorData, null, 2));
+
+                // 通常详细信息在 errorData.error.message 中
+                const message = errorData.error?.message || "Unknown error";
+                console.error(`Status: ${res.status}, Message: ${message}`);
+            } catch (parseError) {
+                // 如果响应不是 JSON（例如网络彻底崩溃），则回退到基础错误
+                console.error(`Firestore REST Error: ${res.statusText}`);
+            }
+
             return [];
         }
 
