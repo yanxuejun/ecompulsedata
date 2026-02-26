@@ -27,21 +27,33 @@ async function getAllCategories() {
         });
 
         if (!res.ok) {
+
+            const errorData = await res.json().catch(() => ({}));
+            const debugInfo = {
+                status: res.status,
+                projectId: projectId,
+                apiKey: apiKey?.substring(0, 5) + "...", // 打印前5位确认是否读取成功
+                error: errorData
+            };
+
+            // 暂时抛出一个错误，Next.js 会在页面上显示错误详情（开发模式）
+            // 或者你可以直接 return 一个包含信息的 div
+            throw new Error(`DEBUG_INFO: ${JSON.stringify(debugInfo)}`);
             // 1. 尝试解析 Firestore 返回的详细错误 JSON
-            try {
-                const errorData = await res.json();
-                console.log("Secret Value:", apiKey);
-                console.error("Firestore Error Details:", JSON.stringify(errorData, null, 2));
+            // try {
+            //     const errorData = await res.json();
+            //     console.log("Secret Value:", apiKey);
+            //     console.error("Firestore Error Details:", JSON.stringify(errorData, null, 2));
 
-                // 通常详细信息在 errorData.error.message 中
-                const message = errorData.error?.message || "Unknown error";
-                console.error(`Status: ${res.status}, Message: ${message}`);
-            } catch (parseError) {
-                // 如果响应不是 JSON（例如网络彻底崩溃），则回退到基础错误
-                console.error(`Firestore REST Error: ${res.statusText}`);
-            }
+            //     // 通常详细信息在 errorData.error.message 中
+            //     const message = errorData.error?.message || "Unknown error";
+            //     console.error(`Status: ${res.status}, Message: ${message}`);
+            // } catch (parseError) {
+            //     // 如果响应不是 JSON（例如网络彻底崩溃），则回退到基础错误
+            //     console.error(`Firestore REST Error: ${res.statusText}`);
+            // }
 
-            return [];
+            // return [];
         }
 
         const data = await res.json();
