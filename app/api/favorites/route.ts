@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       price_range: price_range || '',
       relative_demand: relative_demand || '',
       relative_demand_change: relative_demand_change || '',
-      rank_timestamp: new Date(rank_timestamp)
+      rank_timestamp: new Date(rank_timestamp).toISOString()
     };
 
     console.log('收藏产品 - 插入SQL:', insertQuery);
